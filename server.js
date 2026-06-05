@@ -139,7 +139,8 @@ async function getCalculationResults(searchId) {
         'Accept': 'application/json',
         'Origin': 'https://www.sravni.ru',
         'Referer': 'https://www.sravni.ru/strahovanie-ipoteki/kalkuljator/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Cookie': 'abCookie=ead5b265-b40d-4916.1|833c0117-dcea-467d.0|e562f136-9ae6-4b2f.0|235c890a-f764-491a.1|14482883-88d6-4191.3|8a2b442a-f52a-4e9c.1|fb8da333-9867-4acc.3|706388e1-c0a3-4113.1|c81f3def-aee4-44fb.1|a9063fa5-fd0d-43e8.0|e9349840-37cb-4edd.1|4719fad3-65a0-42a7.0|b784653b-be81-414c.1|1ef0f5fd-3d9b-422e.1|5a80c7e8-a45c-4d7a.0; aspxAnonymousCookie=k1xKJT1p8k2CuoqX-pdeHg'
       }
     });
 
