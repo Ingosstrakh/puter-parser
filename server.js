@@ -40,10 +40,20 @@ app.post('/api/sravni', async (req, res) => {
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
 
+    // Блокируем лишние ресурсы для ускорения
+    await page.setRequestInterception(true);
+    page.on('request', (req) => {
+      if (['image', 'stylesheet', 'font', 'media'].includes(req.resourceType())) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
     // 1. Открываем калькулятор
     await page.goto('https://www.sravni.ru/strahovanie-ipoteki/kalkuljator/', {
-      waitUntil: 'networkidle2',
-      timeout: 30000
+      waitUntil: 'networkidle0',
+      timeout: 60000
     });
 
     await page.waitForTimeout(3000);
@@ -122,8 +132,8 @@ app.post('/api/sravni', async (req, res) => {
       });
     }
 
-    // 5. Ждем загрузки результатов
-    await page.waitForTimeout(8000);
+    // 5. Ждем загрузки результатов (увеличено для медленного free tier)
+    await page.waitForTimeout(12000);
 
     // 6. Парсим цены
     const prices = await page.evaluate(() => {
