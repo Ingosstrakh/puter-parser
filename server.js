@@ -138,15 +138,20 @@ async function getCalculationResults(searchId) {
       headers: {
         'Accept': 'application/json',
         'Origin': 'https://www.sravni.ru',
-        'Referer': 'https://www.sravni.ru/strahovanie-ipoteki/kalkuljator/'
+        'Referer': 'https://www.sravni.ru/strahovanie-ipoteki/kalkuljator/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
       }
     });
 
+    const responseText = await response.text();
+    console.log(`[Sravni] GET attempt ${i+1} status:`, response.status);
+    console.log(`[Sravni] GET response body:`, responseText.substring(0, 500));
+
     if (!response.ok) {
-      throw new Error(`Get results failed: ${response.status}`);
+      throw new Error(`Get results failed: ${response.status} — ${responseText.substring(0, 200)}`);
     }
 
-    const data = await response.json();
+    const data = JSON.parse(responseText);
     
     if (data.isCompleted) {
       return data;
