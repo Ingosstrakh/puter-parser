@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 
 const app = express();
 app.use(cors({ origin: '*' }));
@@ -29,48 +30,77 @@ const BANK_IDS = {
   'ЮниКредит': 228
 };
 
-// Типы продуктов
-const PRODUCT_TYPES = {
-  'life': 'life',
-  'property': 'property',
-  'title': 'title',
-  'all': null
+// productTypes для сравни.ру
+const PRODUCT_TYPE_MAP = {
+  'life': ['life'],
+  'property': ['property'],
+  'title': ['title'],
+  'all': []
 };
+
+function generateUUID() {
+  return crypto.randomUUID ? crypto.randomUUID() : 
+    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = crypto.randomBytes(1)[0] % 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+}
 
 /**
  * Создает расчет на сравни.ру и получает searchId
  */
 async function createCalculation(params) {
-  const { bank, creditSum, age, gender, productType } = params;
+  const { bank, creditSum, age, gender, productType, loanDate } = params;
   
-  const bankId = BANK_IDS[bank] || 262; // default ВТБ
-  const sex = gender === 'женщина' ? 'female' : 'male';
-  const birthDate = new Date();
-  birthDate.setFullYear(birthDate.getFullYear() - age);
-  const birthDateStr = birthDate.toISOString().split('T')[0];
+  const creditBankId = BANK_IDS[bank] || 262;
+  const borrowerSex = gender === 'женщина' ? 'female' : 'male';
   
-  // Определяем тип продукта
-  const pType = PRODUCT_TYPES[productType] || null;
+  // birthDate: age лет назад
+  const now = new Date();
+  const birth = new Date(now.getFullYear() - age, now.getMonth(), now.getDate());
+  const borrowBirthDate = birth.toISOString();
+  
+  // loanAgreementDate: текущая дата или переданная
+  const loanAgreementDate = loanDate ? new Date(loanDate).toISOString() : now.toISOString();
+  
+  const pTypes = PRODUCT_TYPE_MAP[productType] || [];
   
   const payload = {
-    bankId: bankId,
-    creditSum: creditSum,
-    age: age,
-    sex: sex,
-    birthDate: birthDateStr,
-    productType: pType
+    isBackgroundCalculation: false,
+    productTypes: pTypes,
+    creditBankId: creditBankId,
+    balanceOwed: creditSum,
+    borrowBirthDate: borrowBirthDate,
+    borrowerSex: borrowerSex,
+    deviceId: generateUUID(),
+    phone: '79178508969',
+    userId: 43782877,
+    uaClientId: '653276674.1777712485',
+    loanAgreementDate: loanAgreementDate,
+    hasOwnerShip: true,
+    abCookie: 'ead5b265-b40d-4916.1|833c0117-dcea-467d.0|e562f136-9ae6-4b2f.0|235c890a-f764-491a.1|14482883-88d6-4191.3|8a2b442a-f52a-4e9c.1|fb8da333-9867-4acc.3|706388e1-c0a3-4113.1|c81f3def-aee4-44fb.1|a9063fa5-fd0d-43e8.0|e9349840-37cb-4edd.1|4719fad3-65a0-42a7.0|b784653b-be81-414c.1|1ef0f5fd-3d9b-422e.1|5a80c7e8-a45c-4d7a.0',
+    aspxAnonymousCookie: 'k1xKJT1p8k2CuoqX-pdeHg',
+    autonomousSystemNumber: '',
+    extraInfo: '{"yaClientId":"1743853876675120657"}',
+    habitationType: 'house',
+    hasGas: false,
+    overlapMaterial: 'other',
+    partner: {},
+    promoCode: null,
+    promotion: {},
+    utm: {
+      medium: 'organic',
+      source: 'google',
+      campaign: '(not set)',
+      content: '(not set)',
+      term: '(not set)'
+    },
+    wallMaterial: 'rock',
+    ymClientId: '1743853876675120657'
   };
-  
-  // Добавляем риски по типу
-  if (pType === 'life') {
-    payload.risks = ['life'];
-  } else if (pType === 'property') {
-    payload.risks = ['property'];
-  } else if (pType === 'title') {
-    payload.risks = ['title'];
-  } else {
-    payload.risks = ['life', 'property', 'title'];
-  }
+
+  console.log('[Sravni] POST payload:', JSON.stringify(payload));
 
   const response = await fetch('https://www.sravni.ru/strahovanie-ipoteki/api/calculations', {
     method: 'POST',
@@ -78,16 +108,21 @@ async function createCalculation(params) {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'Origin': 'https://www.sravni.ru',
-      'Referer': 'https://www.sravni.ru/strahovanie-ipoteki/kalkuljator/'
+      'Referer': 'https://www.sravni.ru/strahovanie-ipoteki/kalkuljator/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     },
     body: JSON.stringify(payload)
   });
 
+  const responseText = await response.text();
+  console.log('[Sravni] POST response status:', response.status);
+  console.log('[Sravni] POST response body:', responseText.substring(0, 500));
+
   if (!response.ok) {
-    throw new Error(`Create calculation failed: ${response.status}`);
+    throw new Error(`Create calculation failed: ${response.status} — ${responseText.substring(0, 200)}`);
   }
 
-  const data = await response.json();
+  const data = JSON.parse(responseText);
   return data.searchId;
 }
 
@@ -132,26 +167,25 @@ function parsePrices(data) {
     return [];
   }
 
-  const results = [];
-  const seen = new Set();
+  const byCompany = {};
 
   for (const item of data.items) {
-    const name = item.insuranceCompanyName || item.product?.insuranceCompanyName;
+    const name = item.insuranceCompanyName;
     const price = item.price || item.discountPrice;
     
     if (!name || !price || price <= 0) continue;
     
-    const key = name.toLowerCase().replace(/\s/g, '');
-    if (seen.has(key)) continue;
-    seen.add(key);
-
-    results.push({
-      name: name,
-      total: Math.round(price)
-    });
+    if (!byCompany[name]) {
+      byCompany[name] = 0;
+    }
+    byCompany[name] += price;
   }
 
-  // Сортируем по цене
+  const results = Object.entries(byCompany).map(([name, total]) => ({
+    name,
+    total: Math.round(total)
+  }));
+
   results.sort((a, b) => a.total - b.total);
   return results;
 }
