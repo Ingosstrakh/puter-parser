@@ -1,0 +1,17 @@
+{
+  "name": "ingos-sravni-parser",
+  "version": "1.0.0",
+  "description": "Парсер цен со сравни.ру для ипотечного калькулятора Ингосстрах",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "puppeteer": "^21.6.0"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
